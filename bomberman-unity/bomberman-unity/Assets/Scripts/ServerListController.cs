@@ -16,6 +16,8 @@ public class ServerListController : MonoBehaviour
         view.OnLobbiesRefresh += FetchAndRefreshLobbies;
         view.OnLobbiesFilterChanged += RefreshLobbies;
         view.OnCreateLobby += CreateLobby;
+        view.OnLobbySelected += OnLobbySelected;
+        view.OnShow += OnShowView;
     }
 
     private void OnDestroy()
@@ -24,17 +26,27 @@ public class ServerListController : MonoBehaviour
         view.OnLobbiesRefresh -= FetchAndRefreshLobbies;
         view.OnLobbiesFilterChanged -= RefreshLobbies;
         view.OnCreateLobby -= CreateLobby;
+        view.OnLobbySelected -= OnLobbySelected;
+        view.OnShow -= OnShowView;
     }
 
     private void Exit()
     {
-        ViewManager.SwitchToView<MainMenuView>();
+        ViewManager.SwitchToView(typeof(MainMenuView));
     }
 
     private void CreateLobby()
     {
         var server = ServerManager.GetServer();
-        server.CreateLobby();
+        var createdLobbyData = server.CreateLobby();
+        if (createdLobbyData != null)
+        {
+            var lobbyData = server.EnterLobby(createdLobbyData.Id, GameState.GetInstance().PlayerName);
+            if (lobbyData != null)
+            {
+                ViewManager.SwitchToView(typeof(LobbyView));
+            }
+        }
         FetchAndRefreshLobbies();
     }
 
@@ -50,7 +62,7 @@ public class ServerListController : MonoBehaviour
 
         foreach (var lobby in lobbies)
         {
-            if (lobby.id.StartsWith(filter))
+            if (lobby.Id.StartsWith(filter))
             {
                 result.Add(lobby);
             }
@@ -70,5 +82,20 @@ public class ServerListController : MonoBehaviour
         var server = ServerManager.GetServer();
         latestLobbyData = server.GetLobbiesList();
         RefreshLobbies(view.LobbyFilter);
+    }
+
+    private void OnShowView()
+    {
+        FetchAndRefreshLobbies();
+    }
+
+    private void OnLobbySelected(string id)
+    {
+        var server = ServerManager.GetServer();
+        var lobbyData = server.EnterLobby(id, GameState.GetInstance().PlayerName);
+        if (lobbyData != null)
+        {
+            ViewManager.SwitchToView(typeof(LobbyView));
+        }
     }
 }

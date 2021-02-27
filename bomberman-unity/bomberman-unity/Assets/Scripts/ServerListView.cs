@@ -33,6 +33,8 @@ public class ServerListView : ViewBase
 
     public event Action<string> OnLobbiesFilterChanged;
 
+    public event Action<string> OnLobbySelected;
+
     public string LobbyFilter { get; private set; }
 
     public void SetLobbiesView(IEnumerable<LobbyData> data)
@@ -45,7 +47,8 @@ public class ServerListView : ViewBase
             obj.transform.SetParent(grp_ServerListContent.transform, false);
             var item = obj.GetComponent<UILobbyItem>();
             Debug.Assert(item != null);
-            item.SetText("# " + lobby.id);
+            item.OnClick += OnLobbyItemClick;
+            item.SetText("# " + lobby.Id, lobby.Id);
         }
     }
 
@@ -54,6 +57,7 @@ public class ServerListView : ViewBase
         var items = grp_ServerListContent.GetComponentsInChildren<UILobbyItem>();
         foreach (var item in items)
         {
+            item.OnClick -= OnLobbyItemClick;
             GameObject.Destroy(item.gameObject);
         }
     }
@@ -95,5 +99,10 @@ public class ServerListView : ViewBase
         LobbyFilter = if_Filter.text;
         OnLobbiesFilterChanged?.Invoke(if_Filter.text);
         Debug.Log("OnIfFilterValueChange");
+    }
+
+    private void OnLobbyItemClick(string lobbyId)
+    {
+        OnLobbySelected?.Invoke(lobbyId);
     }
 }

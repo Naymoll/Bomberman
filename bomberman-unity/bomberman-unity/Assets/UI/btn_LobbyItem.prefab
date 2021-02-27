@@ -148,7 +148,7 @@ GameObject:
   - component: {fileID: 3126472491848619172}
   - component: {fileID: 939650874531787763}
   m_Layer: 5
-  m_Name: btn_ServerItem
+  m_Name: btn_LobbyItem
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -269,3 +269,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   text: {fileID: 8342144740516984961}
+  btn_LobbyItem: {fileID: 3126472491848619172}

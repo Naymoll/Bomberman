@@ -2,22 +2,18 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ServerManager : MonoBehaviour
+public class ServerManager : PersistantSceneObject<ServerManager>
 {
-    private static ServerManager instance;
-
     private IServer server;
 
-    private void Awake()
+    protected override void Awake()
     {
-        Debug.Assert(instance == null);
-        instance = this;
-
+        base.Awake();
         server = new MockServer();
     }
 
     public static IServer GetServer()
     {
-        return instance.server;
+        return GetInstance().server;
     }
 }

@@ -19,6 +19,6 @@ public class LobbyController : MonoBehaviour
 
     private void Exit()
     {
-        ViewManager.SwitchToView<MainMenuView>();
+        ViewManager.SwitchToView(typeof(MainMenuView));
     }
 }

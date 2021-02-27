@@ -1,27 +1,29 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ViewManager : MonoBehaviour
+public class ViewManager : PersistantSceneObject<ViewManager>
 {
-    private static ViewManager instance;
+    [SerializeField]
+    private ViewBase startView;
 
-    private void Awake()
+    private void Start()
     {
-        Debug.Assert(instance == null);
-        instance = this;
+        SwitchToView(startView.GetType());
     }
 
-    public static void SwitchToView<T>() where T : ViewBase
+    public static void SwitchToView(Type viewType)
     {
+        var instance = GetInstance();
+
         instance.DisableAllViews();
 
-        var views = instance.gameObject.GetComponentsInChildren<T>(true);
+        var views = instance.gameObject.GetComponentsInChildren(viewType, true);
 
-        Debug.Log(views);
         Debug.Assert(views.Length == 1);
 
-        views[0].Show(true);
+        ((ViewBase)(views[0])).Show(true);
     }
 
     private void DisableAllViews()
