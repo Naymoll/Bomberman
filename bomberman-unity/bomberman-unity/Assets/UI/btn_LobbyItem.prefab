@@ -146,6 +146,7 @@ GameObject:
   - component: {fileID: 8059833627980786067}
   - component: {fileID: 2631791490040012441}
   - component: {fileID: 3126472491848619172}
+  - component: {fileID: 939650874531787763}
   m_Layer: 5
   m_Name: btn_ServerItem
   m_TagString: Untagged
@@ -170,7 +171,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -0.000015258789, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &8059833627980786067
@@ -255,3 +256,16 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &939650874531787763
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7913433793858464967}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b76cd843c1116804aa14a69bc6dd71df, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  text: {fileID: 8342144740516984961}
