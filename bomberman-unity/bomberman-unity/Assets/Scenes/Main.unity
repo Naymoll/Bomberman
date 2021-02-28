@@ -350,6 +350,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   PlayerName: 
+  PlayerId: 
+  LobbyId: 
 --- !u!4 &1343557338
 Transform:
   m_ObjectHideFlags: 0
@@ -457,10 +459,6 @@ PrefabInstance:
     - target: {fileID: 1822243047798409411, guid: 8fa86e27199c62045be651a8672fce6e, type: 3}
       propertyPath: m_Name
       value: cnv_Lobby
-      objectReference: {fileID: 0}
-    - target: {fileID: 1822243047798409411, guid: 8fa86e27199c62045be651a8672fce6e, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3407966961283202975, guid: 8fa86e27199c62045be651a8672fce6e, type: 3}
       propertyPath: m_AnchorMax.y
@@ -584,6 +582,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3428773595603036562, guid: 8fa86e27199c62045be651a8672fce6e, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6556544755090222598, guid: 8fa86e27199c62045be651a8672fce6e, type: 3}
+      propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7325657762481719707, guid: 8fa86e27199c62045be651a8672fce6e, type: 3}

@@ -7,6 +7,7 @@ public class PlayerData
 {
     public string Name;
     public string Id;
+    public bool Ready;
 }
 
 [System.Serializable]

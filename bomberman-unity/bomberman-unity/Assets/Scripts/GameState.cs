@@ -4,6 +4,9 @@ using UnityEngine;
 
 public class GameState : PersistantSceneObject<GameState>
 {
-    [SerializeField]
     public string PlayerName;
+
+    public string PlayerId;
+
+    public string LobbyId;
 }

@@ -28,6 +28,9 @@ public class MainMenuController : MonoBehaviour
 
     private void OnViewShow()
     {
+        var gameState = GameState.GetInstance();
+        gameState.PlayerId = null;
+        gameState.LobbyId = null;
 
         if (!string.IsNullOrEmpty(GameState.GetInstance().PlayerName))
         {

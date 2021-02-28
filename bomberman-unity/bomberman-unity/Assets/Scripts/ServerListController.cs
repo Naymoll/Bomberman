@@ -16,7 +16,7 @@ public class ServerListController : MonoBehaviour
         view.OnLobbiesRefresh += FetchAndRefreshLobbies;
         view.OnLobbiesFilterChanged += RefreshLobbies;
         view.OnCreateLobby += CreateLobby;
-        view.OnLobbySelected += OnLobbySelected;
+        view.OnLobbySelected += TryEnterLobby;
         view.OnShow += OnShowView;
     }
 
@@ -26,7 +26,7 @@ public class ServerListController : MonoBehaviour
         view.OnLobbiesRefresh -= FetchAndRefreshLobbies;
         view.OnLobbiesFilterChanged -= RefreshLobbies;
         view.OnCreateLobby -= CreateLobby;
-        view.OnLobbySelected -= OnLobbySelected;
+        view.OnLobbySelected -= TryEnterLobby;
         view.OnShow -= OnShowView;
     }
 
@@ -41,11 +41,7 @@ public class ServerListController : MonoBehaviour
         var createdLobbyData = server.CreateLobby();
         if (createdLobbyData != null)
         {
-            var lobbyData = server.EnterLobby(createdLobbyData.Id, GameState.GetInstance().PlayerName);
-            if (lobbyData != null)
-            {
-                ViewManager.SwitchToView(typeof(LobbyView));
-            }
+            TryEnterLobby(createdLobbyData.Id);
         }
         FetchAndRefreshLobbies();
     }
@@ -89,12 +85,15 @@ public class ServerListController : MonoBehaviour
         FetchAndRefreshLobbies();
     }
 
-    private void OnLobbySelected(string id)
+    private void TryEnterLobby(string id)
     {
         var server = ServerManager.GetServer();
-        var lobbyData = server.EnterLobby(id, GameState.GetInstance().PlayerName);
-        if (lobbyData != null)
+        var playerId = server.EnterLobby(id, GameState.GetInstance().PlayerName);
+        if (playerId != null)
         {
+            var gameState = GameState.GetInstance();
+            gameState.LobbyId = id;
+            gameState.PlayerId = playerId;
             ViewManager.SwitchToView(typeof(LobbyView));
         }
     }
