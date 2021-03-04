@@ -5,129 +5,197 @@ extern crate rocket;
 extern crate serde;
 extern crate serde_json;
 
-use std::collections::HashSet;
+mod api_key;
+mod id;
+mod lobby;
+mod player;
+
+use rocket::http::Status;
+use rocket::response::content;
+use rocket::State;
+
+use api_key::ApiKey;
+use id::{LobbiesId, PlayersId};
+use lobby::{Lobbies, Lobby, LobbyStatus};
+use player::{Player, PlayerStatus};
+
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use rocket::response;
-use serde::{Deserialize, Serialize};
+//TODO: Возможно стоит переделать возврат ошибок
+// Обсудить старт
 
-//TODO: UNSAFE - Боль
-// ПЕРЕДЕЛАТЬ НАХУЙ
-pub unsafe fn last_player_id() -> usize {
-    static mut LAST_PLAYER_ID: AtomicUsize = AtomicUsize::new(0);
-    LAST_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
-}
+#[get("/lobby/<id>")]
+fn lobby(id: usize, state: State<Lobbies>) -> Option<content::Json<String>> {
+    let guard = match state.0.lock() {
+        Ok(guard) => guard,
+        Err(poison) => poison.into_inner(),
+    };
 
-pub unsafe fn last_lobby_id() -> usize {
-    static mut LAST_LOBBY_ID: AtomicUsize = AtomicUsize::new(0);
-    LAST_LOBBY_ID.fetch_add(1, Ordering::Relaxed)
-}
+    let lobby = match guard.get(&id) {
+        Some(lobby) => lobby,
+        None => return None,
+    };
 
-pub unsafe fn get_lobbies() -> &'static mut Vec<Lobby> {
-    static mut LOBBIES: Vec<Lobby> = Vec::new();
-    &mut LOBBIES
-}
-
-pub unsafe fn add_lobby(lobby: Lobby) {
-    let _ = Mutex::new(0).lock().unwrap();
-
-    let lobbies = get_lobbies();
-    lobbies.push(lobby);
-}
-
-pub unsafe fn remove_lobby(lobby: Lobby) {
-    let _ = Mutex::new(0).lock().unwrap();
-
-    let lobbies = get_lobbies();
-    let pos = lobbies.iter().position(|l| l.id == lobby.id).unwrap();
-    lobbies.remove(pos);
-}
-
-#[derive(Deserialize, Serialize, Hash, Eq, PartialEq)]
-pub struct Player {
-    id: usize,
-    nickname: String,
-}
-
-impl Player {
-    pub fn new(nickname: String) -> Self {
-        unsafe {
-            Player {
-                id: last_player_id(),
-                nickname,
-            }
-        }
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
-    pub fn nickname(&self) -> String {
-        self.nickname.clone()
-    }
-
-    pub fn set_nickname(&mut self, nickname: String) {
-        self.nickname = nickname;
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Lobby {
-    id: usize,
-    players: HashSet<Player>,
-}
-
-impl Lobby {
-    pub fn new() -> Self {
-        unsafe {
-            Lobby {
-                id: last_lobby_id(),
-                players: HashSet::new(),
-            }
-        }
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
-    pub fn add_player(&mut self, player: Player) {
-        self.players.insert(player);
-    }
-
-    pub fn remove_player(&mut self, player: Player) -> bool {
-        self.players.remove(&player)
-    }
+    let json = serde_json::to_string(lobby).unwrap();
+    Some(content::Json(json))
 }
 
 #[get("/lobbies")]
-fn lobbies() -> response::content::Json<String> {
-    unsafe {
-        let lobbies = get_lobbies();
-        let json = serde_json::to_string(lobbies).unwrap();
-        response::content::Json(json)
-    }
+fn lobbies(state: State<Lobbies>) -> content::Json<String> {
+    let guard = match state.0.lock() {
+        Ok(guard) => guard,
+        Err(poison) => poison.into_inner(),
+    };
+
+    let lobbies = guard.deref();
+    let json = serde_json::to_string(lobbies).unwrap();
+    content::Json(json)
 }
 
-#[post("/create_lobby")]
-fn create_lobby() -> response::content::Json<String> {
-    let lobby = Lobby::new();
+#[post("/create_lobby/<name>")]
+fn create_lobby(
+    name: String,
+    lobbies_state: State<Lobbies>,
+    id_state: State<LobbiesId>,
+) -> content::Json<String> {
+    let id = id_state.0.fetch_add(1, Ordering::Relaxed);
+    let lobby = Lobby::new(id, name, HashMap::new(), LobbyStatus::Waiting);
+
+    let mut guard = match lobbies_state.0.lock() {
+        Ok(guard) => guard,
+        Err(poison) => poison.into_inner(),
+    };
+
     let json = serde_json::to_string(&lobby).unwrap();
-    unsafe { add_lobby(lobby) }
-    response::content::Json(json)
+    guard.insert(id, lobby);
+
+    content::Json(json)
 }
 
-#[post("/new_player/<nickname>")]
-fn new_player(nickname: String) -> response::content::Json<String> {
-    let player = Player::new(nickname);
+#[post("/enter_lobby/<lobby_id>/<nickname>")]
+fn enter_lobby(
+    lobby_id: usize,
+    nickname: String,
+    key: ApiKey,
+    lobbies_state: State<Lobbies>,
+    id_state: State<PlayersId>,
+) -> Option<content::Json<String>> {
+    let mut guard = match lobbies_state.0.lock() {
+        Ok(guard) => guard,
+        Err(poison) => poison.into_inner(),
+    };
+
+    let lobby = match guard.get_mut(&lobby_id) {
+        Some(lobby) if lobby.status() == LobbyStatus::Waiting => lobby,
+        _ => return None,
+    };
+
+    let id = id_state.0.fetch_add(1, Ordering::Relaxed);
+    let player = Player::new(id, nickname, PlayerStatus::NotReady);
+
     let json = serde_json::to_string(&player).unwrap();
-    response::content::Json(json)
+    lobby.players_mut().insert(id, player);
+
+    Some(content::Json(json))
+}
+
+#[post("/leave_lobby/<lobby_id>/<player_id>")]
+fn leave_lobby(lobby_id: usize, player_id: usize, key: ApiKey, state: State<Lobbies>) -> Status {
+    let mut guard = match state.0.lock() {
+        Ok(guard) => guard,
+        Err(poison) => poison.into_inner(),
+    };
+
+    let lobby = match guard.get_mut(&lobby_id) {
+        Some(lobby) => lobby,
+        None => return Status::NotFound,
+    };
+
+    lobby.players_mut().remove(&player_id);
+    if lobby.players().is_empty() {
+        guard.remove(&lobby_id);
+    }
+
+    Status::Ok
+}
+
+#[put("/change_lobby_status/<lobby_id>/<status>")]
+fn change_lobby_status(
+    lobby_id: usize,
+    status: LobbyStatus,
+    key: ApiKey,
+    state: State<Lobbies>,
+) -> Option<content::Json<String>> {
+    let mut guard = match state.0.lock() {
+        Ok(guard) => guard,
+        Err(poison) => poison.into_inner(),
+    };
+
+    let lobby = match guard.get_mut(&lobby_id) {
+        Some(lobby) => lobby,
+        None => return None,
+    };
+
+    lobby.set_status(status);
+
+    let json = serde_json::to_string(lobby).unwrap();
+    Some(content::Json(json))
+}
+
+#[put("/change_player_status/<lobby_id>/<player_id>/<status>")]
+fn change_player_status(
+    lobby_id: usize,
+    player_id: usize,
+    key: ApiKey,
+    status: PlayerStatus,
+    state: State<Lobbies>,
+) -> Option<content::Json<String>> {
+    let mut guard = match state.0.lock() {
+        Ok(guard) => guard,
+        Err(poison) => poison.into_inner(),
+    };
+
+    let lobby = match guard.get_mut(&lobby_id) {
+        Some(lobby) => lobby,
+        None => return None,
+    };
+
+    let player = match lobby.players_mut().get_mut(&player_id) {
+        Some(player) => player,
+        None => return None,
+    };
+
+    player.set_status(status);
+
+    let json = serde_json::to_string(lobby).unwrap();
+    Some(content::Json(json))
 }
 
 fn main() {
     rocket::ignite()
-        .mount("/", routes![lobbies, create_lobby, new_player])
+        .manage(Lobbies {
+            0: Arc::new(Mutex::new(HashMap::new())),
+        })
+        .manage(PlayersId {
+            0: AtomicUsize::new(0),
+        })
+        .manage(LobbiesId {
+            0: AtomicUsize::new(0),
+        })
+        .mount(
+            "/",
+            routes![
+                lobby,
+                lobbies,
+                create_lobby,
+                enter_lobby,
+                leave_lobby,
+                change_lobby_status,
+                change_player_status
+            ],
+        )
         .launch();
 }
