@@ -22,7 +22,7 @@ use player::{Player, PlayerStatus};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 //TODO: Возможно стоит переделать возврат ошибок
 // Обсудить старт
@@ -177,7 +177,7 @@ fn change_player_status(
 fn main() {
     rocket::ignite()
         .manage(Lobbies {
-            0: Arc::new(Mutex::new(HashMap::new())),
+            0: Mutex::new(HashMap::new()),
         })
         .manage(PlayersId {
             0: AtomicUsize::new(0),
