@@ -102,7 +102,7 @@ fn enter_lobby(
     Some(content::Json(json))
 }
 
-#[post("/leave_lobby/<lobby_id>/<player_id>")]
+#[delete("/leave_lobby/<lobby_id>/<player_id>")]
 fn leave_lobby(lobby_id: usize, player_id: usize, key: ApiKey, state: State<Lobbies>) -> Status {
     let mut guard = match state.0.lock() {
         Ok(guard) => guard,
