@@ -83,40 +83,73 @@ fn enter_lobby(
     lobbies_state: State<Lobbies>,
     id_state: State<PlayersId>,
 ) -> Option<content::Json<String>> {
-    let mut guard = match lobbies_state.inner().0.write() {
-        Ok(guard) => guard,
-        Err(poison) => poison.into_inner(),
+    {
+        let guard = match lobbies_state.0.read() {
+            Ok(guard) => guard,
+            Err(poison) => poison.into_inner(),
+        };
+
+        let lobby = match guard.get(&lobby_id) {
+            Some(lobby) => lobby,
+            None => return None,
+        };
+
+        if lobby.status() != LobbyStatus::Waiting || lobby.players().len() >= 3 {
+            return None;
+        }
+    }
+
+    let json= {
+        let mut guard = match lobbies_state.0.write() {
+            Ok(guard) => guard,
+            Err(poison) => poison.into_inner(),
+        };
+
+        let lobby = match guard.get_mut(&lobby_id) {
+            Some(lobby) if lobby.status() == LobbyStatus::Waiting && lobby.players().len() < 3 => lobby,
+            _ => return None,
+        };
+
+        let id = id_state.0.fetch_add(1, Ordering::Relaxed);
+        let player = Player::new(id, nickname, PlayerStatus::NotReady);
+
+        let json  = serde_json::to_string(&player).unwrap();
+        lobby.players_mut().insert(id, player);
+
+        json
     };
-
-    let lobby = match guard.get_mut(&lobby_id) {
-        Some(lobby) if lobby.status() == LobbyStatus::Waiting && lobby.players().len() < 3 => lobby,
-        _ => return None,
-    };
-
-    let id = id_state.0.fetch_add(1, Ordering::Relaxed);
-    let player = Player::new(id, nickname, PlayerStatus::NotReady);
-
-    let json = serde_json::to_string(&player).unwrap();
-    lobby.players_mut().insert(id, player);
 
     Some(content::Json(json))
 }
 
 #[delete("/leave_lobby/<lobby_id>/<player_id>")]
 fn leave_lobby(lobby_id: usize, player_id: usize, _key: ApiKey, state: State<Lobbies>) -> Status {
-    let mut guard = match state.0.write() {
-        Ok(guard) => guard,
-        Err(poison) => poison.into_inner(),
-    };
+    {
+        let guard = match state.0.read() {
+            Ok(guard) => guard,
+            Err(poison) => poison.into_inner(),
+        };
 
-    let lobby = match guard.get_mut(&lobby_id) {
-        Some(lobby) => lobby,
-        None => return Status::NotFound,
-    };
+        if !guard.contains_key(&lobby_id) {
+            return Status::NotFound;
+        }
+    }
 
-    lobby.players_mut().remove(&player_id);
-    if lobby.players().is_empty() {
-        guard.remove(&lobby_id);
+    {
+        let mut guard = match state.0.write() {
+            Ok(guard) => guard,
+            Err(poison) => poison.into_inner(),
+        };
+
+        let lobby = match guard.get_mut(&lobby_id) {
+            Some(lobby) => lobby,
+            None => return Status::NotFound,
+        };
+
+        lobby.players_mut().remove(&player_id);
+        if lobby.players().is_empty() {
+            guard.remove(&lobby_id);
+        }
     }
 
     Status::Ok
@@ -147,13 +180,11 @@ fn change_lobby_status(
         };
 
         let lobby = match guard.get_mut(&lobby_id) {
-            Some(lobby) => lobby,
+            Some(lobby) => lobby.set_status(status),
             None => return None,
         };
 
-        lobby.set_status(status);
-
-        serde_json::to_string(lobby).unwrap()
+        serde_json::to_string(&lobby).unwrap()
     };
 
     Some(content::Json(json))
@@ -194,12 +225,10 @@ fn change_player_status(
             None => return None,
         };
 
-        let player = match lobby.players_mut().get_mut(&player_id) {
-            Some(player) => player,
+        match lobby.players_mut().get_mut(&player_id) {
+            Some(player) => player.set_status(status),
             None => return None,
         };
-
-        player.set_status(status);
 
         serde_json::to_string(lobby).unwrap()
     };
