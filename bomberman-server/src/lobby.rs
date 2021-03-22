@@ -4,9 +4,9 @@ use rocket::http::RawStr;
 use rocket::request::FromParam;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
+use std::sync::RwLock;
 
-pub struct Lobbies(pub(crate) Mutex<HashMap<usize, Lobby>>);
+pub struct Lobbies(pub(crate) RwLock<HashMap<usize, Lobby>>);
 
 #[derive(serde::Serialize, Copy, Clone, Eq, PartialEq)]
 pub enum LobbyStatus {
