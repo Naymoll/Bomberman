@@ -5,30 +5,30 @@ extern crate rocket;
 extern crate serde;
 extern crate serde_json;
 
-mod api_key;
-mod id;
-mod lobby;
-mod player;
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::RwLock;
 
 use rocket::http::Status;
 use rocket::response::content;
 use rocket::State;
 
 use api_key::ApiKey;
-use id::{LobbiesId, PlayersId};
-use lobby::{Lobbies, Lobby, LobbyStatus};
-use player::{Player, PlayerStatus};
+use data::{Lobby, LobbyStatus, Player, PlayerStatus};
 
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::RwLock;
+mod api_key;
+mod data;
+
+pub struct Lobbies(pub(crate) RwLock<HashMap<u32, Lobby>>);
+pub struct LobbiesId(pub(crate) AtomicU32);
+pub struct PlayersId(pub(crate) AtomicU32);
 
 //TODO: Возможно стоит переделать возврат ошибок
 // Обсудить старт
 
 #[get("/lobby/<id>")]
-fn lobby(id: usize, state: State<Lobbies>) -> Option<content::Json<String>> {
+fn lobby(id: u32, state: State<Lobbies>) -> Option<content::Json<String>> {
     let guard = match state.0.read() {
         Ok(guard) => guard,
         Err(poison) => poison.into_inner(),
@@ -77,7 +77,7 @@ fn create_lobby(
 
 #[post("/enter_lobby/<lobby_id>/<nickname>")]
 fn enter_lobby(
-    lobby_id: usize,
+    lobby_id: u32,
     nickname: String,
     _key: ApiKey,
     lobbies_state: State<Lobbies>,
@@ -99,21 +99,23 @@ fn enter_lobby(
         }
     }
 
-    let json= {
+    let json = {
         let mut guard = match lobbies_state.0.write() {
             Ok(guard) => guard,
             Err(poison) => poison.into_inner(),
         };
 
         let lobby = match guard.get_mut(&lobby_id) {
-            Some(lobby) if lobby.status() == LobbyStatus::Waiting && lobby.players().len() < 3 => lobby,
+            Some(lobby) if lobby.status() == LobbyStatus::Waiting && lobby.players().len() < 3 => {
+                lobby
+            }
             _ => return None,
         };
 
         let id = id_state.0.fetch_add(1, Ordering::Relaxed);
         let player = Player::new(id, nickname, PlayerStatus::NotReady);
 
-        let json  = serde_json::to_string(&player).unwrap();
+        let json = serde_json::to_string(&player).unwrap();
         lobby.players_mut().insert(id, player);
 
         json
@@ -123,7 +125,7 @@ fn enter_lobby(
 }
 
 #[delete("/leave_lobby/<lobby_id>/<player_id>")]
-fn leave_lobby(lobby_id: usize, player_id: usize, _key: ApiKey, state: State<Lobbies>) -> Status {
+fn leave_lobby(lobby_id: u32, player_id: u32, _key: ApiKey, state: State<Lobbies>) -> Status {
     {
         let guard = match state.0.read() {
             Ok(guard) => guard,
@@ -157,7 +159,7 @@ fn leave_lobby(lobby_id: usize, player_id: usize, _key: ApiKey, state: State<Lob
 
 #[put("/change_lobby_status/<lobby_id>/<status>")]
 fn change_lobby_status(
-    lobby_id: usize,
+    lobby_id: u32,
     status: LobbyStatus,
     _key: ApiKey,
     state: State<Lobbies>,
@@ -192,8 +194,8 @@ fn change_lobby_status(
 
 #[put("/change_player_status/<lobby_id>/<player_id>/<status>")]
 fn change_player_status(
-    lobby_id: usize,
-    player_id: usize,
+    lobby_id: u32,
+    player_id: u32,
     _key: ApiKey,
     status: PlayerStatus,
     state: State<Lobbies>,
@@ -242,10 +244,10 @@ fn main() {
             0: RwLock::new(HashMap::new()),
         })
         .manage(PlayersId {
-            0: AtomicUsize::new(0),
+            0: AtomicU32::new(0),
         })
         .manage(LobbiesId {
-            0: AtomicUsize::new(0),
+            0: AtomicU32::new(0),
         })
         .mount(
             "/",
