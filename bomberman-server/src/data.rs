@@ -1,9 +1,10 @@
+use crate::map::Map;
 use rocket::http::RawStr;
 use rocket::request::FromParam;
+use serde::Serialize;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 
-#[derive(serde::Serialize, Copy, Clone, Eq, PartialEq)]
+#[derive(Serialize, Copy, Clone, Eq, PartialEq)]
 pub enum LobbyStatus {
     Waiting,
     InGame,
@@ -21,16 +22,16 @@ impl<'a> FromParam<'a> for LobbyStatus {
     }
 }
 
-#[derive(serde::Serialize, Clone, Eq)]
+#[derive(Serialize)]
 pub struct Lobby {
     id: u32,
     name: String,
-    players: HashMap<u32, Player>,
+    players: Map<u32, Player>,
     status: LobbyStatus,
 }
 
 impl Lobby {
-    pub fn new(id: u32, name: String, players: HashMap<u32, Player>, status: LobbyStatus) -> Self {
+    pub fn new(id: u32, name: String, players: Map<u32, Player>, status: LobbyStatus) -> Self {
         Lobby {
             id,
             name,
@@ -60,19 +61,7 @@ impl Lobby {
     }
 }
 
-impl Hash for Lobby {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl PartialEq for Lobby {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-#[derive(serde::Serialize, Copy, Clone, Eq, PartialEq)]
+#[derive(Serialize, Clone, Copy, Eq, PartialEq)]
 pub enum PlayerStatus {
     NotReady,
     Ready,
@@ -90,7 +79,7 @@ impl<'a> FromParam<'a> for PlayerStatus {
     }
 }
 
-#[derive(serde::Serialize, Clone, Eq)]
+#[derive(Serialize)]
 pub struct Player {
     id: u32,
     nickname: String,
@@ -116,17 +105,5 @@ impl Player {
 
     pub fn set_status(&mut self, status: PlayerStatus) {
         self.status = status;
-    }
-}
-
-impl Hash for Player {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl PartialEq for Player {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
     }
 }

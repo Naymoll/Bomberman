@@ -5,7 +5,6 @@ extern crate rocket;
 extern crate serde;
 extern crate serde_json;
 
-use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
@@ -14,18 +13,17 @@ use rocket::http::Status;
 use rocket::response::content;
 use rocket::State;
 
-use api_key::ApiKey;
-use data::{Lobby, LobbyStatus, Player, PlayerStatus};
+use crate::api_key::ApiKey;
+use crate::data::{Lobby, LobbyStatus, Player, PlayerStatus};
+use crate::map::Map;
 
 mod api_key;
 mod data;
+mod map;
 
-pub struct Lobbies(pub(crate) RwLock<HashMap<u32, Lobby>>);
+pub struct Lobbies(pub(crate) RwLock<Map<u32, Lobby>>);
 pub struct LobbiesId(pub(crate) AtomicU32);
 pub struct PlayersId(pub(crate) AtomicU32);
-
-//TODO: Возможно стоит переделать возврат ошибок
-// Обсудить старт
 
 #[get("/lobby/<id>")]
 fn lobby(id: u32, state: State<Lobbies>) -> Option<content::Json<String>> {
@@ -61,7 +59,7 @@ fn create_lobby(
     id_state: State<LobbiesId>,
 ) -> content::Json<String> {
     let id = id_state.0.fetch_add(1, Ordering::Relaxed);
-    let lobby = Lobby::new(id, name, HashMap::new(), LobbyStatus::Waiting);
+    let lobby = Lobby::new(id, name, Map::new(), LobbyStatus::Waiting);
     let json = serde_json::to_string(&lobby).unwrap();
 
     {
@@ -181,10 +179,8 @@ fn change_lobby_status(
             Err(poison) => poison.into_inner(),
         };
 
-        let lobby = match guard.get_mut(&lobby_id) {
-            Some(lobby) => lobby.set_status(status),
-            None => return None,
-        };
+        let lobby = guard.get_mut(&lobby_id)?;
+        lobby.set_status(status);
 
         serde_json::to_string(&lobby).unwrap()
     };
@@ -206,12 +202,7 @@ fn change_player_status(
             Err(poison) => poison.into_inner(),
         };
 
-        let lobby = match guard.get(&lobby_id) {
-            Some(lobby) => lobby,
-            None => return None,
-        };
-
-        if !lobby.players().contains_key(&player_id) {
+        if !guard.get(&lobby_id)?.players().contains_key(&player_id) {
             return None;
         }
     }
@@ -222,15 +213,8 @@ fn change_player_status(
             Err(poison) => poison.into_inner(),
         };
 
-        let lobby = match guard.get_mut(&lobby_id) {
-            Some(lobby) => lobby,
-            None => return None,
-        };
-
-        match lobby.players_mut().get_mut(&player_id) {
-            Some(player) => player.set_status(status),
-            None => return None,
-        };
+        let lobby = guard.get_mut(&lobby_id)?;
+        lobby.players_mut().get_mut(&player_id)?.set_status(status);
 
         serde_json::to_string(lobby).unwrap()
     };
@@ -241,7 +225,7 @@ fn change_player_status(
 fn main() {
     rocket::ignite()
         .manage(Lobbies {
-            0: RwLock::new(HashMap::new()),
+            0: RwLock::new(Map::new()),
         })
         .manage(PlayersId {
             0: AtomicU32::new(0),
