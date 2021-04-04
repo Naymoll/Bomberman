@@ -34,8 +34,8 @@ where
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
-        for entry in &self.0 {
-            seq.serialize_element(&entry.1)?
+        for (_, value) in &self.0 {
+            seq.serialize_element(value)?;
         }
         seq.end()
     }
